@@ -9,15 +9,26 @@ const axios = require('axios');
 const crypto = require('crypto');
 
 // Inisialisasi Aplikasi Express
-// Inisialisasi Aplikasi Express
+// GANTI DENGAN KODE LENGKAP DI BAWAH INI
 const app = express();
 const port = process.env.PORT || 3000;
 
-// TAMBAHKAN BARIS INI untuk fix masalah CORS di browser
-app.options('*', cors());
+// Definisikan opsi CORS secara eksplisit
+const corsOptions = {
+  origin: "*", // Izinkan SEMUA domain.
+  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+  preflightContinue: false,
+  optionsSuccessStatus: 204
+};
 
-app.use(cors()); // Baris ini biarkan tetap ada
-app.use(bodyParser.json()); // Parse body request sebagai JSON
+// Terapkan CORS untuk preflight request (permintaan izin)
+app.options('*', cors(corsOptions));
+
+// Terapkan CORS untuk semua request utama
+app.use(cors(corsOptions));
+
+// Lanjutkan dengan middleware lain seperti biasa
+app.use(bodyParser.json());
 
 // Inisialisasi Firebase Admin SDK
 // GANTI BLOK KODE DI ATAS DENGAN INI

@@ -9,9 +9,14 @@ const axios = require('axios');
 const crypto = require('crypto');
 
 // Inisialisasi Aplikasi Express
+// Inisialisasi Aplikasi Express
 const app = express();
 const port = process.env.PORT || 3000;
-app.use(cors()); // Aktifkan CORS untuk semua route
+
+// TAMBAHKAN BARIS INI untuk fix masalah CORS di browser
+app.options('*', cors());
+
+app.use(cors()); // Baris ini biarkan tetap ada
 app.use(bodyParser.json()); // Parse body request sebagai JSON
 
 // Inisialisasi Firebase Admin SDK

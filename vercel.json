@@ -1,0 +1,8 @@
+{
+    "rewrites": [
+      { "source": "/api/charge-transaction", "destination": "/api/charge-transaction.js" },
+      { "source": "/api/midtrans-notification", "destination": "/api/midtrans-notification.js" },
+      { "source": "/api/validate-promo", "destination": "/api/validate-promo.js" }
+    ]
+  }
+  

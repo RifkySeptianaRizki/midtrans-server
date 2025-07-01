@@ -1,4 +1,9 @@
+# Folder dependensi
 node_modules/
+
+# File environment
 .env
-config/serviceAccountKey.json
+
+# File kredensial dan log
+serviceAccountKey.json
 npm-debug.log

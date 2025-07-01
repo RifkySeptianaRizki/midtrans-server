@@ -23,7 +23,7 @@ const midtransCoreApi = new midtransClient.CoreApi({
 });
 
 // --- Handler Utama untuk Vercel Serverless Function ---
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   // --- Blok Wajib untuk Menangani CORS ---
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');

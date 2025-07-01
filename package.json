@@ -8,11 +8,16 @@
     "build": "",
     "start": ""
   },
-  "keywords": ["midtrans", "firebase", "vercel", "serverless"],
+  "keywords": [
+    "midtrans",
+    "firebase",
+    "vercel",
+    "serverless"
+  ],
   "author": "Rifky",
   "license": "MIT",
   "dependencies": {
-    "axios": "^1.7.2",
+    "axios": "^0.27.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",

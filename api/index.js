@@ -15,19 +15,26 @@ app.use(cors()); // Aktifkan CORS untuk semua route
 app.use(bodyParser.json()); // Parse body request sebagai JSON
 
 // Inisialisasi Firebase Admin SDK
+// GANTI BLOK KODE DI ATAS DENGAN INI
 try {
-    const serviceAccountPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-    if (!serviceAccountPath) {
-        console.error("FATAL ERROR: GOOGLE_APPLICATION_CREDENTIALS path not defined in .env. Please set the path to your service account key file.");
-        process.exit(1);
+    const serviceAccountString = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    if (!serviceAccountString) {
+      throw new Error("GOOGLE_APPLICATION_CREDENTIALS environment variable is not set.");
     }
-    const serviceAccount = require(serviceAccountPath);
-    admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+    
+    // Parse string JSON menjadi objek JavaScript
+    const serviceAccount = JSON.parse(serviceAccountString);
+  
+    // Inisialisasi Firebase dengan objek kredensial
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount)
+    });
     console.log("Firebase Admin SDK initialized successfully.");
-} catch (e) {
-    console.error("FATAL ERROR: Firebase Admin SDK Initialization Failed.", e.message, e.stack);
-    process.exit(1);
-}
+  
+  } catch (e) {
+    console.error("FATAL ERROR: Firebase Admin SDK Initialization Failed.", e.message);
+    process.exit(1); // Hentikan server jika inisialisasi gagal
+  }
 const db = admin.firestore(); // Instance Firestore Database
 
 // Inisialisasi Midtrans Core API Client
@@ -460,7 +467,5 @@ app.post('/api/midtrans-notification', async (req, res) => {
     }
 });
 
-// Listener
-app.listen(port, () => {
-    console.log(`Server backend Midtrans (Core API - v1.0) berjalan di http://localhost:${port}`);
-});
+/// Tambahkan ini di baris paling akhir file
+module.exports = app;

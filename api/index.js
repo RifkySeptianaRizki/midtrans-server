@@ -67,7 +67,7 @@ app.use((req, res, next) => {
 
 
 // === ENDPOINT VALIDASI PROMO ===
-app.post('/api/validate-promo', async (req, res) => {
+app.post('/validate-promo', async (req, res) => {
     const endpointName = '[VALIDATE_PROMO]'; // Untuk logging
     try {
         const { promoCode, userId, cartSubtotal } = req.body;
@@ -173,7 +173,7 @@ app.post('/api/validate-promo', async (req, res) => {
 
 
 // === ENDPOINT CHARGE TRANSACTION ===
-app.post('/api/charge-transaction', async (req, res) => {
+app.post('/charge-transaction', async (req, res) => {
     const endpointName = '[CHARGE_TRANSACTION]';
     try {
         const {
@@ -386,7 +386,7 @@ app.post('/api/charge-transaction', async (req, res) => {
 });
 
 // === ENDPOINT NOTIFIKASI MIDTRANS (SUDAH CUKUP BAIK DARI SEBELUMNYA) ===
-app.post('/api/midtrans-notification', async (req, res) => {
+app.post('/midtrans-notification', async (req, res) => {
     // ... (Kode notifikasi Anda yang sudah ada, pastikan konsisten dengan perubahan status OrderModel) ...
     const endpointName = '[MIDTRANS_NOTIFICATION]';
     console.log(`${endpointName} Received raw body:`, JSON.stringify(req.body));

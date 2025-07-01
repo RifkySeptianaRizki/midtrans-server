@@ -1,7 +1,7 @@
 {
   "functions": {
     "api/**/*.js": {
-      "runtime": "vercel-node@canary"
+      "runtime": "nodejs18.x"
     }
   },
   "routes": [

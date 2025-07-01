@@ -28,10 +28,13 @@ try {
     const serviceAccount = JSON.parse(serviceAccountString);
   
     // Inisialisasi Firebase dengan objek kredensial
+    // Cek jika aplikasi Firebase belum pernah diinisialisasi
+    if (admin.apps.length === 0) {
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount)
     });
-    console.log("Firebase Admin SDK initialized successfully.");
+    console.log("Firebase Admin SDK initialized for the first time.");
+  }
   
   } catch (e) {
     console.error("FATAL ERROR: Firebase Admin SDK Initialization Failed.", e.message);

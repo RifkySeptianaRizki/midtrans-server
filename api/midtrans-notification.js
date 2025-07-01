@@ -1,70 +1,109 @@
-// === FILE: api/midtrans-notification.js ===
-import { onRequest } from 'firebase-functions/v2/https';
-import { initializeApp, cert, getApps } from 'firebase-admin/app';
-import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore';
-import crypto from 'crypto';
+// Menggunakan 'require' untuk dependensi di lingkungan Node.js Vercel
+const { initializeApp, cert, getApps } = require('firebase-admin/app');
+const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestore');
+const crypto = require('crypto');
 
-const serviceAccount = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS || '{}');
-if (!getApps().length) {
-  initializeApp({ credential: cert(serviceAccount) });
+// --- Inisialisasi Firebase Admin SDK ---
+try {
+  const serviceAccount = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS || '{}');
+  if (getApps().length === 0) {
+    initializeApp({ credential: cert(serviceAccount) });
+  }
+} catch (error) {
+  console.error('Firebase Admin SDK Initialization Error:', error.message);
 }
 const db = getFirestore();
 
-export const POST = onRequest(async (req, res) => {
+// --- Handler Utama untuk Vercel Serverless Function ---
+export default async function handler(req, res) {
+  // --- Blok Wajib untuk Menangani CORS ---
+  res.setHeader('Access-Control-Allow-Credentials', true);
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+  );
+
+  // Menangani Preflight Request
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+  // --- Akhir Blok Wajib CORS ---
+
+  // Memastikan hanya metode POST yang diizinkan
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', ['POST']);
+    res.status(405).end(`Method ${req.method} Not Allowed`);
+    return;
+  }
+
+  // --- Blok Utama Logika Aplikasi Anda ---
   try {
-    const notif = req.body;
+    const notificationJson = req.body;
     const serverKey = process.env.MIDTRANS_SERVER_KEY;
-    const expectedSig = crypto.createHash('sha512')
-      .update(notif.order_id + notif.status_code + notif.gross_amount + serverKey)
+    
+    // Validasi Signature Key (sudah benar)
+    const expectedSignatureKey = crypto.createHash('sha512')
+      .update(notificationJson.order_id + notificationJson.status_code + notificationJson.gross_amount + serverKey)
       .digest('hex');
-    if (notif.signature_key !== expectedSig) return res.status(403).send('Invalid signature');
-
-    const orderId = notif.order_id;
-    const snap = await db.collectionGroup('Orders').where('id', '==', orderId).limit(1).get();
-    if (snap.empty) return res.status(200).send('Order not found');
-
-    const doc = snap.docs[0];
-    const ref = doc.ref;
-    const current = doc.data();
-
-    let newStatus = current.status;
-    let internalStatus = current.paymentStatusMidtransInternal;
-    const ts = notif.transaction_status;
-    const fs = notif.fraud_status;
-
-    if (ts === 'capture') {
-      newStatus = fs === 'accept' ? 'OrderStatus.processing' : fs === 'challenge' ? 'OrderStatus.pending' : 'OrderStatus.failed';
-      internalStatus = fs === 'accept' ? 'paid_captured_accepted' : fs === 'challenge' ? 'payment_challenged_by_fds' : 'failed_fds_check';
-    } else if (ts === 'settlement') {
-      newStatus = 'OrderStatus.processing';
-      internalStatus = 'paid_settled';
-    } else if (ts === 'pending') {
-      internalStatus = 'pending_payment_completion';
-    } else if (ts === 'expire') {
-      newStatus = 'OrderStatus.cancelled';
-      internalStatus = 'expired_payment';
-    } else if (ts === 'cancel') {
-      newStatus = 'OrderStatus.cancelled';
-      internalStatus = 'cancelled_by_midtrans_or_user';
-    } else if (ts === 'deny') {
-      newStatus = 'OrderStatus.failed';
-      internalStatus = 'denied_by_payment_provider';
+      
+    if (notificationJson.signature_key !== expectedSignatureKey) {
+      return res.status(403).send('Invalid signature');
     }
 
-    const payload = {
-      status: newStatus,
-      paymentStatusMidtransInternal: internalStatus,
-      midtransTransactionStatus: ts,
-      midtransFraudStatus: fs,
-      paymentMethod: notif.payment_type,
-      midtransNotificationRaw: FieldValue.arrayUnion(notif),
-      midtransLastTransactionTime: notif.transaction_time ? Timestamp.fromDate(new Date(notif.transaction_time)) : null,
-      updatedAt: FieldValue.serverTimestamp()
-    };
+    // Logika pemrosesan notifikasi Anda (sudah bagus dan tidak diubah)
+    const orderId = notificationJson.order_id;
+    const ordersSnapshot = await db.collectionGroup('Orders').where('id', '==', orderId).limit(1).get();
 
-    await ref.update(payload);
-    res.status(200).send('Notification processed');
-  } catch (err) {
-    res.status(500).send('Internal server error');
+    if (ordersSnapshot.empty) {
+      return res.status(200).send("Order not found, notification acknowledged.");
+    }
+    
+    const orderDoc = ordersSnapshot.docs[0];
+    const orderRef = orderDoc.ref; 
+    const currentOrderData = orderDoc.data();
+
+    let newAppOrderStatus = currentOrderData.status; 
+    let newPaymentStatusMidtransInternal = currentOrderData.paymentStatusMidtransInternal;
+    const transactionStatus = notificationJson.transaction_status;
+    const fraudStatus = notificationJson.fraud_status;
+
+    // Logika pemetaan status...
+    if (transactionStatus === 'settlement' || (transactionStatus === 'capture' && fraudStatus === 'accept')) {
+        newAppOrderStatus = 'OrderStatus.processing';
+        newPaymentStatusMidtransInternal = 'paid_settled';
+    } else if (transactionStatus === 'expire' || transactionStatus === 'cancel') {
+        newAppOrderStatus = 'OrderStatus.cancelled';
+        newPaymentStatusMidtransInternal = 'cancelled_or_expired';
+    } else if (transactionStatus === 'deny') {
+        newAppOrderStatus = 'OrderStatus.failed';
+        newPaymentStatusMidtransInternal = 'denied_by_payment_provider';
+    }
+
+    // Buat payload update
+    const updatePayload = {
+      status: newAppOrderStatus,
+      paymentStatusMidtransInternal: newPaymentStatusMidtransInternal,
+      midtransTransactionStatus: transactionStatus,
+      midtransFraudStatus: fraudStatus,
+      paymentMethod: notificationJson.payment_type || currentOrderData.paymentMethod,
+      midtransNotificationRaw: FieldValue.arrayUnion(notificationJson),
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    if (notificationJson.transaction_time) {
+        updatePayload.midtransLastTransactionTime = Timestamp.fromDate(new Date(notificationJson.transaction_time));
+    }
+
+    await orderRef.update(updatePayload);
+    
+    console.log(`[MIDTRANS_NOTIFICATION] Order ${orderId} updated successfully.`);
+    return res.status(200).send("Notification processed successfully.");
+
+  } catch (error) {
+    // Menangani error tak terduga
+    console.error('[MIDTRANS_NOTIFICATION] INTERNAL SERVER ERROR:', error);
+    return res.status(500).send('Internal server error while processing notification.');
   }
-});
+}

@@ -53,9 +53,19 @@ export default async function handler(req, res) {
       return res.status(403).send('Invalid signature');
     }
 
-    // Logika pemrosesan notifikasi Anda (sudah bagus dan tidak diubah)
-    const orderId = notificationJson.order_id;
-    const ordersSnapshot = await db.collectionGroup('Orders').where('id', '==', orderId).limit(1).get();
+    // Ambil orderId dan userId dari notifikasi
+const orderId = notificationJson.order_id;
+const userId = notificationJson.custom_field1;
+
+// Pengaman jika userId tidak ditemukan di notifikasi
+if (!userId) {
+  console.error(`Error: userId not found in Midtrans notification for order ${orderId}.`);
+  return res.status(400).send("Bad Request: Missing userId in notification.");
+}
+
+// Lakukan pencarian langsung ke sub-koleksi pengguna yang spesifik
+const ordersRef = db.collection('Users').doc(userId).collection('Orders');
+const ordersSnapshot = await ordersRef.where('id', '==', orderId).limit(1).get();
 
     if (ordersSnapshot.empty) {
       return res.status(200).send("Order not found, notification acknowledged.");

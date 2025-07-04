@@ -102,8 +102,11 @@ module.exports = async function handler(req, res) {
       transaction_details: { order_id: orderId, gross_amount: Math.round(grossAmount) },
       item_details: itemDetailsToSend,
       customer_details: customerDetails,
-      payment_type: paymentType.toLowerCase() // Disederhanakan
+      payment_type: paymentType.toLowerCase(),
+      custom_field1: userId
     };
+
+    await midtransCoreApi.charge(chargeParam);
 
     if (chargeParam.payment_type === 'bca_va') {
         chargeParam.payment_type = 'bank_transfer';

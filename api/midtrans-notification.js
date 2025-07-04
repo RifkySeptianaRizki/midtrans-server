@@ -65,22 +65,28 @@ export default async function handler(req, res) {
     const orderRef = orderDoc.ref; 
     const currentOrderData = orderDoc.data();
 
-    let newAppOrderStatus = currentOrderData.status; 
-    let newPaymentStatusMidtransInternal = currentOrderData.paymentStatusMidtransInternal;
-    const transactionStatus = notificationJson.transaction_status;
-    const fraudStatus = notificationJson.fraud_status;
+    // Inisialisasi variabel (sudah benar)
+let newAppOrderStatus = currentOrderData.status || 'pending';
+let newPaymentStatusMidtransInternal = currentOrderData.paymentStatusMidtransInternal || 'awaiting_payment';
+const transactionStatus = notificationJson.transaction_status;
+const fraudStatus = notificationJson.fraud_status;
 
-    // Logika pemetaan status...
-    if (transactionStatus === 'settlement' || (transactionStatus === 'capture' && fraudStatus === 'accept')) {
-        newAppOrderStatus = 'OrderStatus.processing';
-        newPaymentStatusMidtransInternal = 'paid_settled';
-    } else if (transactionStatus === 'expire' || transactionStatus === 'cancel') {
-        newAppOrderStatus = 'OrderStatus.cancelled';
-        newPaymentStatusMidtransInternal = 'cancelled_or_expired';
-    } else if (transactionStatus === 'deny') {
-        newAppOrderStatus = 'OrderStatus.failed';
-        newPaymentStatusMidtransInternal = 'denied_by_payment_provider';
-    }
+// 1. Kondisi 'capture' & 'accept' ditambahkan
+if (transactionStatus === 'settlement' || (transactionStatus === 'capture' && fraudStatus === 'accept')) {
+    newAppOrderStatus = 'processing';
+    // 2. Perbarui juga status internal pembayaran
+    newPaymentStatusMidtransInternal = 'paid_settled'; 
+
+} else if (transactionStatus === 'expire' || transactionStatus === 'cancel') {
+    newAppOrderStatus = 'cancelled';
+    // 2. Perbarui juga status internal pembayaran
+    newPaymentStatusMidtransInternal = 'cancelled_or_expired';
+
+} else if (transactionStatus === 'deny') {
+    newAppOrderStatus = 'failed';
+    // 2. Perbarui juga status internal pembayaran
+    newPaymentStatusMidtransInternal = 'denied_by_payment_provider';
+}
 
     // Buat payload update
     const updatePayload = {

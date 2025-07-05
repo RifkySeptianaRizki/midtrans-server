@@ -1,8 +1,6 @@
-// Menggunakan 'require' untuk dependensi di lingkungan Node.js Vercel
 const { initializeApp, cert, getApps } = require('firebase-admin/app');
 const { getFirestore, Timestamp, FieldValue } = require('firebase-admin/firestore');
 const midtransClient = require('midtrans-client');
-const axios = require('axios');
 
 // --- Inisialisasi Firebase Admin SDK ---
 try {
@@ -56,13 +54,18 @@ module.exports = async function handler(req, res) {
       appliedPromoCode, discountApplied
     } = req.body;
 
-    // Logika Anda untuk validasi, menyimpan ke Firestore, dan charge ke Midtrans
-    // sudah sangat bagus dan tidak saya ubah.
-    // ... (SELURUH LOGIKA CHARGE ANDA DARI TRY-CATCH DIMASUKKAN KE SINI) ...
+    // ✅ PERBAIKAN #1: Tambahkan validasi userId di awal
+    if (!userId || typeof userId !== 'string' || userId.trim() === '') {
+        return res.status(400).json({
+            error: "Data Tidak Lengkap",
+            details: "Informasi ID pengguna tidak valid. Silakan coba login ulang."
+        });
+    }
 
+    // Menggunakan 'Users' (huruf besar) sesuai struktur database Anda
     const orderRef = db.collection('Users').doc(userId).collection('Orders').doc(orderId);
 
-    // Verifikasi total
+    // Verifikasi total (sudah benar)
     const serverCalculatedDiscount = discountApplied || 0;
     const expectedTotal = parseFloat((productSubtotal - serverCalculatedDiscount + shippingCost + taxAmount).toFixed(2));
     const clientGrossAmount = parseFloat(grossAmount.toFixed(2));
@@ -72,7 +75,9 @@ module.exports = async function handler(req, res) {
 
     // Simpan data awal order
     const orderDataToSave = {
-      id: orderId, userId, status: 'OrderStatus.pending', totalAmount: grossAmount,
+      id: orderId, userId, 
+      status: 'pending',
+      totalAmount: grossAmount,
       productSubtotal, shippingCost, taxAmount, appliedPromoCode: appliedPromoCode || null,
       discountApplied: serverCalculatedDiscount > 0 ? serverCalculatedDiscount : null,
       orderDate: FieldValue.serverTimestamp(),
@@ -86,7 +91,7 @@ module.exports = async function handler(req, res) {
     };
     await orderRef.set(orderDataToSave, { merge: true });
 
-    // Siapkan item_details dengan diskon
+    // Siapkan item_details dengan diskon (sudah benar)
     const itemDetailsToSend = [...itemDetailsForMidtrans];
     if (typeof discountApplied === 'number' && discountApplied > 0) {
       itemDetailsToSend.push({
@@ -97,7 +102,7 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    // Buat parameter charge Midtrans
+    // Buat parameter charge Midtrans (sudah benar)
     const chargeParam = {
       transaction_details: { order_id: orderId, gross_amount: Math.round(grossAmount) },
       item_details: itemDetailsToSend,
@@ -106,8 +111,7 @@ module.exports = async function handler(req, res) {
       custom_field1: userId
     };
 
-    await midtransCoreApi.charge(chargeParam);
-
+    // Logika VA (sudah benar)
     if (chargeParam.payment_type === 'bca_va') {
         chargeParam.payment_type = 'bank_transfer';
         chargeParam.bank_transfer = { bank: 'bca' };
@@ -116,14 +120,26 @@ module.exports = async function handler(req, res) {
         chargeParam.bank_transfer = { bank: 'permata' };
     }
 
-    // Lakukan charge
-    const chargeResponse = await midtransCoreApi.charge(chargeParam);
+    // ✅ PERBAIKAN #3: Logika Idempotency untuk mencegah error 406
+    let chargeResponse;
+    try {
+        // Cek dulu status transaksi di Midtrans
+        chargeResponse = await midtransCoreApi.transaction.status(orderId);
+    } catch (e) {
+        // Jika errornya 404, berarti transaksi belum ada, maka kita buat charge baru.
+        if (e.httpStatusCode === 404) {
+            // ✅ PERBAIKAN #4: Panggilan charge HANYA dilakukan di sini
+            chargeResponse = await midtransCoreApi.charge(chargeParam);
+        } else {
+            // Jika error lain, lemparkan agar ditangkap oleh catch utama
+            throw e;
+        }
+    }
 
-    // Update data di Firestore setelah charge
-    // ... (Logika update Anda sudah baik)
+    // Update data di Firestore setelah charge (sudah benar)
     await orderRef.update({ 
         midtransTransactionId: chargeResponse.transaction_id,
-        /* ... sisa field update lainnya ... */
+        paymentStatusMidtransInternal: 'awaiting_payment_confirmation',
         updatedAt: FieldValue.serverTimestamp()
     });
     
@@ -131,7 +147,7 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ message: 'Transaksi berhasil dibuat', midtransResponse: chargeResponse });
 
   } catch (err) {
-    // Menangani error tak terduga
+    // Menangani error tak terduga (sudah benar)
     console.error('[CHARGE_TRANSACTION] INTERNAL SERVER ERROR:', err);
     return res.status(500).json({ error: 'Gagal memproses pembayaran.', details: err.message });
   }

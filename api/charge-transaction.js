@@ -123,17 +123,20 @@ module.exports = async function handler(req, res) {
     // ✅ PERBAIKAN #3: Logika Idempotency untuk mencegah error 406
     let chargeResponse;
     try {
-        // Cek dulu status transaksi di Midtrans
-        chargeResponse = await midtransCoreApi.transaction.status(orderId);
+    // Cek dulu status transaksi di Midtrans
+    chargeResponse = await midtransCoreApi.transaction.status(orderId);
+    console.log(`[CHARGE_TRANSACTION] Transaction ${orderId} already exists. Status:`, chargeResponse.transaction_status);
+
     } catch (e) {
-        // Jika errornya 404, berarti transaksi belum ada, maka kita buat charge baru.
-        if (e.httpStatusCode === 404) {
-            // ✅ PERBAIKAN #4: Panggilan charge HANYA dilakukan di sini
-            chargeResponse = await midtransCoreApi.charge(chargeParam);
-        } else {
-            // Jika error lain, lemparkan agar ditangkap oleh catch utama
-            throw e;
-        }
+    // ✅ PERBAIKAN: Bandingkan dengan string '404'
+    if (e.httpStatusCode === '404') {
+        console.log(`[CHARGE_TRANSACTION] Transaction ${orderId} not found. Creating new charge...`);
+        // Baru kita buat charge baru jika belum ada.
+        chargeResponse = await midtransCoreApi.charge(chargeParam);
+    } else {
+        // Jika error lain (bukan 404), lemparkan agar ditangkap oleh catch utama
+        throw e;
+    }
     }
 
     // Update data di Firestore setelah charge (sudah benar)
